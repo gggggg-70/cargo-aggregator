@@ -193,3 +193,64 @@ class DellaParser(BaseParser):
         except Exception as e:
             print("ati error", e)
     return results
+    # parsers/ati_parser.py
+class AtiParser(BaseParser):
+    def __init__(self, base_url: str, session: aiohttp.ClientSession):
+        super().__init__(base_url, session)
+        self.cookies = None
+        
+    async def login(self, username: str, password: str):
+        """Авторизация на ATI (требуется аккаунт)"""
+        login_url = f"{self.base_url}/login"
+        
+        async with self.session.post(login_url, data={
+            'username': username,
+            'password': password
+        }) as response:
+            if response.status == 200:
+                self.cookies = response.cookies
+                return True
+        return False
+    
+    async def parse_list_page(self, page: int) -> List[CargoAd]:
+        # ATI использует POST запросы с параметрами фильтров
+        url = f"{self.base_url}/truck/order/search"
+        
+        payload = {
+            'page': page,
+            'limit': 50,
+            'cargoType': 'all',
+            # Другие параметры фильтров
+        }
+        
+        async with self.session.post(url, json=payload, cookies=self.cookies) as response:
+            data = await response.json()
+            
+        ads = []
+        for item in data.get('orders', []):
+            try:
+                ad = CargoAd(
+                    source='ati',
+                    external_id=item.get('id'),
+                    title=item.get('cargoName', ''),
+                    loading_city=item.get('loadingCity', {}).get('name', ''),
+                    unloading_city=item.get('unloadingCity', {}).get('name', ''),
+                    cargo_type=item.get('cargoType', ''),
+                    weight=float(item.get('weight', 0)),
+                    volume=float(item.get('volume', 0)),
+                    price=float(item.get('price', 0)) if item.get('price') else None,
+                    currency=item.get('currency', 'RUB'),
+                    loading_date=item.get('loadingDate', ''),
+                    contact_info={
+                        'company': item.get('companyName', ''),
+                        'phone': item.get('contactPhone', '')
+                    },
+                    created_at=item.get('createdAt', ''),
+                    url=f"{self.base_url}/truck/order/{item.get('id')}",
+                    is_active=item.get('isActive', True)
+                )
+                ads.append(ad)
+            except Exception as e:
+                self.logger.error(f"Ошибка парсинга ATI элемента: {e}")
+        
+        return ads
