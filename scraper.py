@@ -25,7 +25,62 @@ def can_fetch(url, user_agent="*"):
 def search_della_ati(query):
     # query example: "Алматы-Астана" or "Москва-Казань"
     results = []
-    # parsers/della_parser.py
+# parsers/base_parser.py
+import asyncio
+import aiohttp
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import List, Dict, Optional
+import logging
+
+@dataclass
+class CargoAd:
+    source: str  # 'della' или 'ati'
+    external_id: str
+    title: str
+    loading_city: str
+    unloading_city: str
+    cargo_type: str
+    weight: float
+    volume: float
+    price: Optional[float]
+    currency: str
+    loading_date: str
+    contact_info: Dict
+    created_at: str
+    url: str
+    is_active: bool = True
+
+class BaseParser(ABC):
+    def __init__(self, base_url: str, session: aiohttp.ClientSession):
+        self.base_url = base_url
+        self.session = session
+        self.logger = logging.getLogger(self.__class__.__name__)
+        
+    @abstractmethod
+    async def parse_list_page(self, page: int) -> List[CargoAd]:
+        """Парсинг страницы со списком объявлений"""
+        pass
+        
+    @abstractmethod
+    async def parse_detail(self, ad_id: str) -> CargoAd:
+        """Парсинг детальной страницы объявления"""
+        pass
+    
+    async def get_all_ads(self, max_pages: int = 50) -> List[CargoAd]:
+        """Сбор всех объявлений"""
+        all_ads = []
+        for page in range(1, max_pages + 1):
+            try:
+                ads = await self.parse_list_page(page)
+                if not ads:
+                    break
+                all_ads.extend(ads)
+                await asyncio.sleep(1)  # Задержка
+            except Exception as e:
+                self.logger.error(f"Ошибка на странице {page}: {e}")
+        return all_ads
+        # parsers/della_parser.py
 import re
 from bs4 import BeautifulSoup
 
