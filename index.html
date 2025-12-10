@@ -1,0 +1,26 @@
+
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <title>Пример — Поиск грузов</title>
+    <link rel="stylesheet" href="/static/simple.css">
+  </head>
+  <body>
+    <div class="container">
+      <h1>Поиск грузов с Della и ATI (демо)</h1>
+      <form action="/search" method="post">
+        <input name="query" placeholder="Например: Алматы-Астана" style="width:60%"/>
+        <button type="submit">Найти</button>
+      </form>
+      {% if query %}
+        <h2>Результаты для "{{ query }}"</h2>
+      {% endif %}
+      <ul>
+      {% for r in results %}
+        <li><b>{{ r.source }}</b> — {{ r.title }} — <a href="{{ r.link }}" target="_blank">ссылка</a></li>
+      {% endfor %}
+      </ul>
+    </div>
+  </body>
+</html>
